@@ -16,6 +16,7 @@ services:
   puente:
     build: ./app
     image: tinympc-app:local
+    pull_policy: build        # se construye aqui; no existe en ningun registro
     command: ["python", "-u", "puente.py"]
     environment:
       CUBY_USUARIO: ${CUBY_USUARIO}
@@ -35,7 +36,8 @@ services:
     restart: unless-stopped
 
   panel:
-    image: tinympc-app:local
+    image: tinympc-app:local   # la que construye el servicio puente
+    pull_policy: never
     command: ["python", "-u", "panel.py"]
     environment:
       PANEL_USUARIO: ${PANEL_USUARIO}
