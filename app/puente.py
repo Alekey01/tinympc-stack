@@ -49,6 +49,11 @@ ENVIAR = os.environ.get("MODO_ENVIO", "enviar").lower() == "enviar"
 PLACA_ID = os.environ.get("PLACA_ID", "cocina")
 SP_USER = int(os.environ.get("SP_USUARIO", "24"))
 MODO = os.environ.get("MODO_MPC", "normal")
+# Usar el horario aprendido para esperar gente (pre-enfriar). En la cocina va
+# apagado: el TERRA esta en la puerta y no ve el efecto del aire, asi que
+# anticipar solo dejaba el aire encendido horas con la cocina vacia (visto el
+# 2026-10-02). Sin anticipar, solo cuenta la gente de los ultimos 30 min.
+ANTICIPAR = os.environ.get("ANTICIPAR", "0") == "1"
 
 LUZ_GENTE = 100                  # en la cocina la luz es la referencia de presencia
 SP_MIN, SP_MAX = 22, 27
@@ -208,7 +213,12 @@ class Puente:
         log(f"placa: {','.join(self.placa('HOLA'))}")
         self.placa(linea_modelo(self.modelo, MODO))
         self.placa("APR,1")
-        log(f"modelo cargado en la placa ({self.origen}, modo {MODO}); aprendizaje en linea; "
+        try:
+            self.placa(f"ANT,{int(ANTICIPAR)}")
+        except RuntimeError as e:          # firmware viejo sin ANT: sigue con su valor
+            log(f"AVISO: la placa no acepta ANT ({e}); usa su valor por defecto (anticipar)")
+        log(f"modelo cargado en la placa ({self.origen}, modo {MODO}, anticipar {'si' if ANTICIPAR else 'no'}); "
+            f"aprendizaje en linea; "
             f"{'MANDANDO al aire' if ENVIAR else 'modo sombra'}")
 
     def aprendido(self):

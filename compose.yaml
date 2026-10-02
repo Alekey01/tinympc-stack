@@ -39,6 +39,8 @@ services:
       MQTT_USUARIO: ${MQTT_USUARIO}
       MQTT_CLAVE: ${MQTT_CLAVE}
       PLACA_ID: ${PLACA_ID:-cocina}
+      MODO_MPC: ${MODO_MPC:-normal}
+      ANTICIPAR: ${ANTICIPAR:-0}
       DATOS: /datos
     volumes:
       - datos:/datos
