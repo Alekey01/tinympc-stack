@@ -1,5 +1,11 @@
 # tinympc: el ESP32 decide con TinyMPC; este stack es su puente con las APIs de
 # Cuby y sirve el panel. Variables en .env (ver .env.example).
+#
+# Todo entra por Traefik (red externa "proxy", HTTPS con el certificado
+# *.cubytest.space); no se publican puertos en el host (el firewall solo deja
+# 22/80/443):
+#   https://${PANEL_DOMINIO}   -> panel (con usuario y contrasena)
+#   wss://${MQTT_DOMINIO}      -> broker MQTT por WebSocket (el ESP32 se conecta aqui)
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0.20
@@ -9,8 +15,14 @@ services:
       MQTT_CLAVE: ${MQTT_CLAVE}
     volumes:
       - ./mosquitto:/mosquitto/config:ro
-    ports:
-      - "${MQTT_PUERTO:-1883}:1883"
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.tinympc-mqtt.rule: Host(`${MQTT_DOMINIO:-mqtt-tinympc.cubytest.space}`)
+      traefik.http.routers.tinympc-mqtt.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.tinympc-mqtt.tls: "true"
+      traefik.http.services.tinympc-mqtt.loadbalancer.server.port: "9001"
     restart: unless-stopped
 
   puente:
@@ -45,11 +57,21 @@ services:
       DATOS: /datos
     volumes:
       - datos:/datos:ro
-    ports:
-      - "${PANEL_PUERTO:-8765}:8765"
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: proxy
+      traefik.http.routers.tinympc-panel.rule: Host(`${PANEL_DOMINIO:-tinympc.cubytest.space}`)
+      traefik.http.routers.tinympc-panel.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.tinympc-panel.tls: "true"
+      traefik.http.services.tinympc-panel.loadbalancer.server.port: "8765"
     depends_on:
       - puente
     restart: unless-stopped
+
+networks:
+  proxy:
+    external: true
 
 volumes:
   datos:
