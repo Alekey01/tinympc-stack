@@ -1,0 +1,53 @@
+# tinympc: el ESP32 decide con TinyMPC; este stack es su puente con las APIs de
+# Cuby y sirve el panel. Variables en .env (ver .env.example).
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    entrypoint: ["/bin/sh", "/mosquitto/config/arranque.sh"]
+    environment:
+      MQTT_USUARIO: ${MQTT_USUARIO}
+      MQTT_CLAVE: ${MQTT_CLAVE}
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+    ports:
+      - "${MQTT_PUERTO:-1883}:1883"
+    restart: unless-stopped
+
+  puente:
+    build: ./app
+    image: tinympc-app:local
+    command: ["python", "-u", "puente.py"]
+    environment:
+      CUBY_USUARIO: ${CUBY_USUARIO}
+      CUBY_CLAVE: ${CUBY_CLAVE}
+      TERRA_MAC: ${TERRA_MAC:-F09E9E1EB52C}
+      MODO_ENVIO: ${MODO_ENVIO:-enviar}
+      MQTT_HOST: mosquitto
+      MQTT_USUARIO: ${MQTT_USUARIO}
+      MQTT_CLAVE: ${MQTT_CLAVE}
+      PLACA_ID: ${PLACA_ID:-cocina}
+      DATOS: /datos
+    volumes:
+      - datos:/datos
+    depends_on:
+      - mosquitto
+    stop_grace_period: 30s   # al detenerse restaura el apagado por vacio del TERRA
+    restart: unless-stopped
+
+  panel:
+    image: tinympc-app:local
+    command: ["python", "-u", "panel.py"]
+    environment:
+      PANEL_USUARIO: ${PANEL_USUARIO}
+      PANEL_CLAVE: ${PANEL_CLAVE}
+      DATOS: /datos
+    volumes:
+      - datos:/datos:ro
+    ports:
+      - "${PANEL_PUERTO:-8765}:8765"
+    depends_on:
+      - puente
+    restart: unless-stopped
+
+volumes:
+  datos:

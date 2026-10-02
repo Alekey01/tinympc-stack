@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel cocina MPC</title>
+<style>
+/* Colores: todos como variables; el modo oscuro tiene sus propios tonos. */
+:root {
+  color-scheme: light;
+  --plano: #f9f9f7;
+  --superficie: #fcfcfb;
+  --tinta: #0b0b0b;
+  --tinta-2: #52514e;
+  --tenue: #6f6d68;
+  --reja: #e1e0d9;
+  --eje: #c3c2b7;
+  --borde: rgba(11, 11, 11, 0.10);
+  --serie-1: #2a78d6;              /* temperatura */
+  --serie-2: #eb6834;              /* setpoint del aire / nivel planeado */
+  --serie-7: #4a3aa7;              /* comandos */
+  --banda: rgba(237, 161, 0, 0.18);/* presencia */
+  --bien: #006300;   --bien-fondo: rgba(12, 163, 12, 0.12);
+  --aviso: #7a4f00;  --aviso-fondo: rgba(250, 178, 25, 0.22);
+  --critico: #a32828;--critico-fondo: rgba(208, 59, 59, 0.12);
+  --info: #1c5cab;   --info-fondo: rgba(42, 120, 214, 0.10);
+  --sombra-tip: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plano: #0d0d0d;
+    --superficie: #1a1a19;
+    --tinta: #ffffff;
+    --tinta-2: #c3c2b7;
+    --tenue: #9a988f;
+    --reja: #2c2c2a;
+    --eje: #46463f;
+    --borde: rgba(255, 255, 255, 0.10);
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-7: #9085e9;
+    --banda: rgba(201, 133, 0, 0.22);
+    --bien: #0ca30c;   --bien-fondo: rgba(12, 163, 12, 0.16);
+    --aviso: #fab219;  --aviso-fondo: rgba(250, 178, 25, 0.14);
+    --critico: #e66767;--critico-fondo: rgba(208, 59, 59, 0.18);
+    --info: #86b6ef;   --info-fondo: rgba(57, 135, 229, 0.16);
+    --sombra-tip: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plano: #0d0d0d;
+  --superficie: #1a1a19;
+  --tinta: #ffffff;
+  --tinta-2: #c3c2b7;
+  --tenue: #9a988f;
+  --reja: #2c2c2a;
+  --eje: #46463f;
+  --borde: rgba(255, 255, 255, 0.10);
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-7: #9085e9;
+  --banda: rgba(201, 133, 0, 0.22);
+  --bien: #0ca30c;   --bien-fondo: rgba(12, 163, 12, 0.16);
+  --aviso: #fab219;  --aviso-fondo: rgba(250, 178, 25, 0.14);
+  --critico: #e66767;--critico-fondo: rgba(208, 59, 59, 0.18);
+  --info: #86b6ef;   --info-fondo: rgba(57, 135, 229, 0.16);
+  --sombra-tip: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--plano);
+  color: var(--tinta);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+
+header.cabeza { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 14px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--tinta-2); font-size: 13px; }
+.controles { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.controles input, .controles button {
+  font: inherit; font-size: 13px; color: var(--tinta); background: var(--superficie);
+  border: 1px solid var(--borde); border-radius: 8px; padding: 5px 9px;
+}
+.controles button { cursor: pointer; }
+.controles button:hover { background: var(--info-fondo); }
+
+.estado { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.chip.bien { color: var(--bien); background: var(--bien-fondo); }
+.chip.aviso { color: var(--aviso); background: var(--aviso-fondo); }
+.chip.critico { color: var(--critico); background: var(--critico-fondo); }
+.chip.info { color: var(--info); background: var(--info-fondo); }
+.chip.tenue { color: var(--tinta-2); background: var(--borde); }
+.nota { color: var(--tinta-2); font-size: 13px; }
+.error { color: var(--critico); background: var(--critico-fondo); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }
+
+.fichas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 14px; }
+.ficha { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+.ficha .et { color: var(--tinta-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ficha .val { font-size: 26px; font-weight: 650; margin-top: 2px; }
+.ficha .det { color: var(--tinta-2); font-size: 12.5px; }
+
+.tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 14px; min-width: 0; }
+.tarjeta h2 { font-size: 16px; margin: 0 0 2px; }
+.tarjeta h3 { font-size: 14px; margin: 14px 0 4px; }
+.tarjeta .sub { margin-bottom: 8px; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--tinta-2); margin: 4px 0 6px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda svg { flex: none; }
+
+.graf { position: relative; width: 100%; min-width: 0; }
+.graf svg { display: block; touch-action: pan-y; }
+.vacio { color: var(--tenue); font-size: 14px; margin: 18px 0; }
+
+/* marcas de las graficas (SVG) */
+.l-temp { fill: none; stroke: var(--serie-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.l-sp { fill: none; stroke: var(--serie-2); stroke-width: 2; stroke-linejoin: round; }
+.l-ref { fill: none; stroke: var(--tinta-2); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.banda { fill: var(--banda); }
+.reja { stroke: var(--reja); stroke-width: 1; }
+.eje { stroke: var(--eje); stroke-width: 1; }
+.eje-txt { fill: var(--tenue); font-size: 11px; font-variant-numeric: tabular-nums; }
+.marca { stroke: var(--serie-7); stroke-width: 1.5; }
+.marca.sombra { stroke-dasharray: 3 3; }
+.marca-pt { fill: var(--serie-7); stroke: var(--superficie); stroke-width: 2; }
+.marca-pt.sombra { fill: var(--superficie); stroke: var(--serie-7); stroke-width: 1.5; }
+.cruz { stroke: var(--tinta-2); stroke-width: 1; stroke-dasharray: 2 3; }
+.p-temp { fill: var(--serie-1); stroke: var(--superficie); stroke-width: 2; }
+.p-sp { fill: var(--serie-2); stroke: var(--superficie); stroke-width: 2; }
+.barra { fill: var(--serie-1); }
+.capa-hover { fill: transparent; cursor: crosshair; }
+
+#tip {
+  position: fixed; z-index: 10; pointer-events: none; display: none;
+  background: var(--superficie); color: var(--tinta); border: 1px solid var(--borde);
+  border-radius: 8px; box-shadow: var(--sombra-tip); padding: 8px 10px; font-size: 12.5px;
+  max-width: min(300px, calc(100vw - 24px));
+}
+#tip b { font-weight: 650; }
+#tip .fila { display: flex; justify-content: space-between; gap: 14px; }
+#tip .fila span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+#tip .cmd { margin-top: 4px; color: var(--serie-7); font-weight: 600; }
+
+/* Entradas -> ESP32 -> Salidas */
+.flujo { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr); gap: 10px; align-items: stretch; margin: 6px 0 4px; }
+.caja { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.caja.placa { background: var(--info-fondo); }
+.caja h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--tinta-2); }
+.caja dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13.5px; }
+.caja dt { color: var(--tinta-2); }
+.caja dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.flecha { align-self: center; color: var(--tenue); font-size: 20px; }
+@media (max-width: 720px) {
+  .flujo { grid-template-columns: minmax(0,1fr); }
+  .flecha { justify-self: center; transform: rotate(90deg); line-height: 1; }
+}
+.dos { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 16px; }
+@media (max-width: 720px) { .dos { grid-template-columns: minmax(0,1fr); } }
+
+/* modelo */
+.frases { margin: 6px 0 0; padding-left: 18px; }
+.frases li { margin: 3px 0; }
+.si { color: var(--bien); font-weight: 650; }
+.no { color: var(--critico); font-weight: 650; }
+.tira-et { font-size: 12.5px; color: var(--tinta-2); margin: 10px 0 3px; }
+.tira { display: grid; grid-template-columns: repeat(48, minmax(0,1fr)); gap: 1px; height: 22px; }
+.tira div { border-radius: 2px; background: var(--reja); }
+.tira-horas { position: relative; height: 16px; font-size: 11px; color: var(--tenue); }
+.tira-horas span { position: absolute; transform: translateX(-50%); }
+.tira-horas span:first-child { transform: none; }
+.tira-horas span:last-child { transform: translateX(-100%); }
+details { margin-top: 10px; font-size: 13px; }
+details summary { cursor: pointer; color: var(--tinta-2); }
+table.crudo { border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+table.crudo td { padding: 2px 12px 2px 0; border-bottom: 1px solid var(--reja); }
+table.crudo td:first-child { color: var(--tinta-2); font-family: ui-monospace, Menlo, monospace; }
+
+/* modelo aprendido en linea */
+.aviso-caja { color: var(--critico); background: var(--critico-fondo); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 14px; font-weight: 600; }
+.tabla-env { width: 100%; overflow-x: auto; }
+table.comp { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 6px; }
+table.comp th { text-align: right; font-weight: 600; color: var(--tinta-2); font-size: 12px; padding: 4px 0 4px 10px; border-bottom: 1px solid var(--eje); }
+table.comp th:first-child, table.comp td:first-child { text-align: left; padding-left: 0; }
+table.comp td { text-align: right; padding: 4px 0 4px 10px; border-bottom: 1px solid var(--reja); font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.comp td:first-child { font-variant-numeric: normal; white-space: normal; }
+table.comp td .clave { display: block; color: var(--tenue); font-size: 11.5px; font-family: ui-monospace, Menlo, monospace; }
+.mini { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; }
+@media (max-width: 720px) { .mini { grid-template-columns: minmax(0, 1fr); } }
+.mini h4 { font-size: 13px; margin: 10px 0 0; }
+.mini h4 span { color: var(--tinta-2); font-weight: 400; }
+.cuenta { font-size: 13.5px; color: var(--tinta-2); margin-top: 8px; }
+.cuenta b { color: var(--tinta); font-variant-numeric: tabular-nums; }
+
+pre.log {
+  margin: 6px 0 0; padding: 10px 12px; background: var(--plano); border: 1px solid var(--borde); border-radius: 8px;
+  font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--tinta);
+  max-height: 340px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+footer { color: var(--tenue); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="cabeza">
+    <div>
+      <h1>Cocina: TinyMPC en el ESP32</h1>
+      <div class="sub" id="sub">Cargando...</div>
+    </div>
+    <div class="controles">
+      <label class="sub" for="fecha">Día</label>
+      <input type="date" id="fecha">
+      <button id="hoy" type="button">Hoy</button>
+      <button id="recargar" type="button">Actualizar</button>
+    </div>
+  </header>
+
+  <div class="error" id="error" hidden></div>
+  <div class="estado" id="estado"></div>
+
+  <section class="fichas" id="fichas"></section>
+
+  <section class="tarjeta">
+    <h2>Temperatura y aire</h2>
+    <div class="sub">Temperatura del cuarto, setpoint del aire mientras está encendido, presencia (luz &gt; 100 lx) y comandos mandados.</div>
+    <div class="leyenda" id="ley-principal"></div>
+    <div class="graf" id="g-principal"></div>
+  </section>
+
+  <section class="tarjeta" id="t-vivo" hidden>
+    <h2>Entradas &rarr; ESP32 &rarr; Salidas</h2>
+    <div class="sub" id="vivo-sub"></div>
+    <div class="flujo" id="flujo"></div>
+    <div class="dos">
+      <div>
+        <h3>Nivel que planea el ESP32 contra la temperatura real</h3>
+        <div class="leyenda" id="ley-nivel"></div>
+        <div class="graf" id="g-nivel"></div>
+      </div>
+      <div>
+        <h3>Tiempo de cálculo por decisión (ms)</h3>
+        <div class="leyenda"><span class="nota">Una barra por cada vez que resolvió el MPC (cada 5 min).</span></div>
+        <div class="graf" id="g-ms"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tarjeta" id="t-modelo">
+    <h2>Modelo de la cocina</h2>
+    <div id="modelo"></div>
+  </section>
+
+  <section class="tarjeta" id="t-aprendido" hidden>
+    <h2>Modelo aprendido en línea</h2>
+    <div class="sub" id="apr-sub"></div>
+    <div id="apr-aviso"></div>
+    <h3>De la prueba &rarr; ahora</h3>
+    <ul class="frases" id="apr-frases"></ul>
+    <div class="tabla-env"><table class="comp" id="apr-tabla"></table></div>
+    <div class="cuenta" id="apr-cuenta"></div>
+    <h3>Evolución durante el día</h3>
+    <div class="leyenda" id="ley-apr"></div>
+    <div class="mini" id="apr-graficas"></div>
+  </section>
+
+  <section class="tarjeta">
+    <h2>Registro de la prueba</h2>
+    <div class="sub">Últimas líneas de datos/cocina/prueba.log</div>
+    <pre class="log" id="log"></pre>
+  </section>
+
+  <footer id="pie"></footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+'use strict';
+// Panel de la cocina: lee /api/datos cada 30 s y dibuja todo con SVG a mano.
+// Las horas se muestran en hora de Ciudad de Mexico (UTC-6), sin depender de
+// la zona horaria del navegador.
+
+const MX = -6 * 3600;          // desfase de Ciudad de Mexico, en s
+const LUZ_GENTE = 100;         // lux: con mas luz se considera que hay gente
+const HUECO = 5 * 60;          // mas de 5 min sin datos: se corta la linea
+const VIEJO = 3 * 60;          // ultima lectura con mas de 3 min: aviso
+const CADA_MS = 30000;         // refresco
+const KAPPA_MIN = 0.005;       // igual que tools/mpc.py: debajo, el setpoint no importa
+
+let ultimo = null;             // ultima respuesta de /api/datos
+let fechaSel = '';             // '' = hoy (lo decide el servidor)
+
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, '0');
+const num = (v) => typeof v === 'number' && isFinite(v);
+const ahoraS = () => Date.now() / 1000;
+
+function hora(ts, conSeg) {
+  const d = new Date((ts + MX) * 1000);
+  return pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + (conSeg ? ':' + pad(d.getUTCSeconds()) : '');
+}
+function fmt(v, dec, unidad) {
+  return num(v) ? v.toFixed(dec) + (unidad ? ' ' + unidad : '') : '—';
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function hace(seg) {
+  if (seg < 90) return 'hace ' + Math.max(0, Math.round(seg)) + ' s';
+  if (seg < 5400) return 'hace ' + Math.round(seg / 60) + ' min';
+  return 'hace ' + (seg / 3600).toFixed(1) + ' h';
+}
+
+// Comando de la API en palabras
+function describir(c) {
+  if (!c) return 'sin cambio';
+  if (c.power === 'off') return 'apagar';
+  let s = 'encender';
+  if (c.mode) s += c.mode === 'cool' ? ' en frío' : ' en ' + c.mode;
+  if (num(c.temperature)) s += ' a ' + c.temperature + ' °C';
+  if (c.fan) s += ', ventilador ' + c.fan;
+  return s;
+}
+
+// ---------------------------------------------------------------- datos
+
+// Une prueba y vivo en una sola lista de filas por minuto, con la misma forma.
+function normalizar(d) {
+  const filas = [];
+  for (const r of d.prueba || []) {
+    if (!r || !num(r.ts)) continue;
+    const m = r.m || {};
+    filas.push({
+      ts: r.ts, fuente: 'prueba', m,
+      t: m.temperature, luz: m.lux, hum: m.humidity, radar: m.occupied,
+      on: m.ac_power ? 1 : 0, sp: m.ac_setpoint,
+      mandadoCmd: r.mandado || null,
+    });
+  }
+  for (const r of d.vivo || []) {
+    const rec = r && r.rec;
+    if (!rec || !num(rec.ts)) continue;
+    const m = r.m || {};
+    const ir = rec.ir || {};
+    filas.push({
+      ts: rec.ts, fuente: 'vivo', m, rec,
+      t: num(rec.t) ? rec.t : m.temperature,
+      luz: num(rec.luz) ? rec.luz : m.lux,
+      hum: m.humidity, radar: m.occupied,
+      on: ir.on ? 1 : 0, sp: num(ir.sp) ? ir.sp : m.ac_setpoint,
+      placa: r.placa || {}, cmd: r.cmd || null, mandado: !!r.mandado,
+      aprendido: r.aprendido || null,
+    });
+  }
+  filas.sort((a, b) => a.ts - b.ts);
+
+  // Momentos con comando: en la prueba, cada cambio de "mandado"; en vivo,
+  // lo que se mando, y en sombra lo que habria cambiado el aire.
+  const marcas = [];
+  let previo = null;
+  for (const f of filas) {
+    if (f.fuente === 'prueba') {
+      const s = f.mandadoCmd ? JSON.stringify(f.mandadoCmd) : null;
+      if (s) {
+        if (s !== previo) marcas.push({ ts: f.ts, tipo: 'mandado', texto: describir(f.mandadoCmd) });
+        previo = s;
+      }
+    } else if (f.cmd) {
+      if (f.mandado) marcas.push({ ts: f.ts, tipo: 'mandado', texto: describir(f.cmd) });
+      else if (cambiaria(f)) marcas.push({ ts: f.ts, tipo: 'sombra', texto: describir(f.cmd) });
+    }
+  }
+  const porTs = new Map(marcas.map((k) => [k.ts, k]));
+  for (const f of filas) f.marca = porTs.get(f.ts) || null;
+  return { filas, marcas };
+}
+
+// En sombra: el comando decidido habria cambiado algo del aire?
+function cambiaria(f) {
+  const quiere = f.cmd.power === 'on';
+  if (quiere !== !!f.on) return true;
+  return quiere && num(f.cmd.temperature) && num(f.sp) && f.cmd.temperature !== Math.round(f.sp);
+}
+
+function modo(d) {
+  const v = d.vivo || [];
+  if (v.length) {
+    return v.some((r) => r && r.mandado)
+      ? { clase: 'bien', texto: 'Mandando al aire' }
+      : { clase: 'aviso', texto: 'Modo sombra (decide, no manda)' };
+  }
+  if ((d.prueba || []).length) return { clase: 'info', texto: 'Prueba de identificación' };
+  return { clase: 'tenue', texto: 'Sin datos de este día' };
+}
+
+// Tramos [desde, hasta] en que se cumple cond (para las franjas de presencia)
+function tramos(filas, cond) {
+  const out = [];
+  for (let i = 0; i < filas.length; i++) {
+    const f = filas[i];
+    if (!cond(f)) continue;
+    const sig = filas[i + 1];
+    const fin = sig && sig.ts - f.ts <= HUECO ? sig.ts : f.ts + 60;
+    const ult = out[out.length - 1];
+    if (ult && f.ts - ult[1] <= 1) ult[1] = fin; else out.push([f.ts, fin]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- graficas
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, padre) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (padre) padre.appendChild(e);
+  return e;
+}
+
+function ticksY(lo, hi, n) {
+  const pasos = [0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05,
+                 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+  const paso = pasos.find((p) => (hi - lo) / p <= n) || pasos[pasos.length - 1];
+  const out = [];
+  for (let v = Math.ceil(lo / paso - 1e-9) * paso; v <= hi + 1e-9; v += paso) out.push(+v.toFixed(6));
+  return { valores: out, dec: paso >= 1 ? 0 : Math.ceil(-Math.log10(paso) - 1e-9) };
+}
+
+function ticksX(t0, t1, anchoPx) {
+  const opciones = [10, 15, 30, 60, 120, 180, 240, 360, 720].map((m) => m * 60);
+  const max = Math.max(2, Math.floor(anchoPx / 62));
+  const paso = opciones.find((p) => (t1 - t0) / p <= max) || 43200;
+  const out = [];
+  for (let t = Math.ceil((t0 + MX) / paso) * paso - MX; t <= t1; t += paso) out.push(t);
+  return out;
+}
+
+// Linea con cortes donde faltan datos
+function trazo(filas, get, X, Y, hueco) {
+  const h = hueco || HUECO;
+  let d = '', prev = null;
+  for (const f of filas) {
+    const v = get(f);
+    if (!num(v)) { prev = null; continue; }
+    d += (prev && f.ts - prev.ts <= h ? 'L' : 'M') + X(f.ts).toFixed(1) + ',' + Y(v).toFixed(1);
+    prev = f;
+  }
+  return d;
+}
+
+// Escalones: el valor se sostiene hasta la siguiente fila, solo donde cond(f)
+function escalones(filas, get, cond, X, Y) {
+  let d = '', abierto = false;
+  for (let i = 0; i < filas.length; i++) {
+    const f = filas[i], sig = filas[i + 1];
+    const v = get(f);
+    if (!cond(f) || !num(v)) { abierto = false; continue; }
+    const seguido = !!(sig && sig.ts - f.ts <= HUECO);
+    const x0 = X(f.ts).toFixed(1), x1 = X(seguido ? sig.ts : f.ts + 60).toFixed(1), y = Y(v).toFixed(1);
+    d += (abierto ? 'L' : 'M') + x0 + ',' + y + 'L' + x1 + ',' + y;
+    abierto = seguido;
+  }
+  return d;
+}
+
+function dominioX(filas) {
+  let t0 = filas[0].ts, t1 = filas[filas.length - 1].ts;
+  t0 = Math.floor((t0 + MX) / 900) * 900 - MX;
+  t1 = Math.ceil((t1 + MX) / 900) * 900 - MX;
+  if (t1 - t0 < 3600) t1 = t0 + 3600;
+  return [t0, t1];
+}
+
+// Grafica generica: ejes, reja, franjas, capas propias y capa de hover.
+// cfg: {alto, t0, t1, yLo, yHi, nY, bandas, capas(svg,X,Y), puntos:[{ts, html, ys:[{v,cls}]}], etiqueta}
+function grafica(cont, cfg) {
+  cont.innerHTML = '';
+  const ancho = Math.max(240, Math.floor(cont.clientWidth));
+  const alto = cfg.alto;
+  const M = { i: cfg.margenIzq || 42, d: 10, a: 10, b: 24 };
+  const anchoP = ancho - M.i - M.d, altoP = alto - M.a - M.b;
+  const X = (ts) => M.i + (ts - cfg.t0) / (cfg.t1 - cfg.t0) * anchoP;
+  const Y = (v) => M.a + (cfg.yHi - v) / (cfg.yHi - cfg.yLo) * altoP;
+  const svg = el('svg', { viewBox: `0 0 ${ancho} ${alto}`, width: ancho, height: alto, role: 'img', 'aria-label': cfg.etiqueta || '' }, cont);
+
+  for (const [a, b] of cfg.bandas || []) {
+    el('rect', { x: X(a).toFixed(1), y: M.a, width: Math.max(1, X(b) - X(a)).toFixed(1), height: altoP, class: 'banda' }, svg);
+  }
+  const ty = ticksY(cfg.yLo, cfg.yHi, cfg.nY || 5);
+  for (const v of ty.valores) {
+    el('line', { x1: M.i, x2: ancho - M.d, y1: Y(v), y2: Y(v), class: 'reja' }, svg);
+    el('text', { x: M.i - 6, y: Y(v) + 4, class: 'eje-txt', 'text-anchor': 'end' }, svg).textContent = v.toFixed(ty.dec);
+  }
+  el('line', { x1: M.i, x2: ancho - M.d, y1: alto - M.b, y2: alto - M.b, class: 'eje' }, svg);
+  for (const t of ticksX(cfg.t0, cfg.t1, anchoP)) {
+    el('line', { x1: X(t), x2: X(t), y1: alto - M.b, y2: alto - M.b + 4, class: 'eje' }, svg);
+    // en las orillas se alinea hacia adentro para que no se corte
+    const ancla = X(t) > ancho - M.d - 16 ? 'end' : X(t) < M.i + 4 ? 'start' : 'middle';
+    el('text', { x: X(t), y: alto - M.b + 16, class: 'eje-txt', 'text-anchor': ancla }, svg).textContent = hora(t);
+  }
+  cfg.capas(svg, X, Y);
+
+  // hover: cruz vertical, puntos en las series y tooltip con la fila mas cercana
+  const puntos = cfg.puntos || [];
+  if (!puntos.length) return;
+  const cruz = el('line', { y1: M.a, y2: alto - M.b, class: 'cruz', visibility: 'hidden' }, svg);
+  const grupo = el('g', {}, svg);
+  const capa = el('rect', { x: M.i, y: 0, width: anchoP, height: alto, class: 'capa-hover' }, svg);
+  const mover = (ev) => {
+    const caja = svg.getBoundingClientRect();
+    const x = (ev.clientX - caja.left) * (ancho / caja.width);
+    const ts = cfg.t0 + (x - M.i) / anchoP * (cfg.t1 - cfg.t0);
+    let lo = 0, hi = puntos.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (puntos[m].ts < ts) lo = m; else hi = m; }
+    const p = Math.abs(puntos[lo].ts - ts) <= Math.abs(puntos[hi].ts - ts) ? puntos[lo] : puntos[hi];
+    const px = X(p.ts);
+    cruz.setAttribute('x1', px); cruz.setAttribute('x2', px); cruz.setAttribute('visibility', 'visible');
+    grupo.innerHTML = '';
+    for (const y of p.ys || []) if (num(y.v)) el('circle', { cx: px, cy: Y(y.v), r: 4, class: y.cls }, grupo);
+    mostrarTip(p.html, ev.clientX, ev.clientY);
+  };
+  const salir = () => { cruz.setAttribute('visibility', 'hidden'); grupo.innerHTML = ''; ocultarTip(); };
+  capa.addEventListener('pointermove', mover);
+  capa.addEventListener('pointerdown', mover);
+  capa.addEventListener('pointerleave', salir);
+}
+
+function marcasSVG(svg, marcas, X, yA, yB) {
+  for (const k of marcas) {
+    const x = X(k.ts).toFixed(1);
+    const cls = k.tipo === 'sombra' ? 'marca sombra' : 'marca';
+    el('line', { x1: x, x2: x, y1: yA, y2: yB, class: cls }, svg);
+    el('circle', { cx: x, cy: yA + 4, r: 4, class: k.tipo === 'sombra' ? 'marca-pt sombra' : 'marca-pt' }, svg);
+  }
+}
+
+// Muestras para la leyenda
+const MUESTRA = {
+  linea: (v) => `<svg width="18" height="10"><line x1="1" y1="5" x2="17" y2="5" stroke="var(${v})" stroke-width="2" stroke-linecap="round"/></svg>`,
+  escalon: (v) => `<svg width="18" height="10"><path d="M1 8H9V2H17" fill="none" stroke="var(${v})" stroke-width="2"/></svg>`,
+  banda: () => `<svg width="14" height="12"><rect width="14" height="12" rx="2" fill="var(--banda)"/></svg>`,
+  marca: (sombra) => `<svg width="10" height="14"><line x1="5" y1="2" x2="5" y2="14" stroke="var(--serie-7)" stroke-width="1.5" ${sombra ? 'stroke-dasharray="3 3"' : ''}/><circle cx="5" cy="4" r="3" fill="${sombra ? 'var(--superficie)' : 'var(--serie-7)'}" stroke="var(--serie-7)" stroke-width="1.2"/></svg>`,
+};
+
+function filaTip(et, val) { return `<div class="fila"><span>${esc(et)}</span><span>${esc(val)}</span></div>`; }
+
+function htmlFila(f) {
+  let h = `<b>${hora(f.ts)}</b> <span class="nota">${f.fuente === 'vivo' ? 'en vivo' : 'prueba'}</span>`;
+  h += filaTip('Temperatura', fmt(f.t, 1, '°C'));
+  h += filaTip('Aire', f.on ? 'encendido a ' + fmt(f.sp, 0, '°C') : 'apagado');
+  h += filaTip('Luz', fmt(f.luz, 0, 'lx') + (num(f.luz) && f.luz > LUZ_GENTE ? ' (gente)' : ''));
+  if (f.fuente === 'vivo' && num(f.placa.nivel)) h += filaTip('Nivel planeado', fmt(f.placa.nivel, 2, '°C'));
+  if (f.marca) h += `<div class="cmd">${f.marca.tipo === 'sombra' ? 'Sombra (no se mandó): ' : 'Comando: '}${esc(f.marca.texto)}</div>`;
+  return h;
+}
+
+function graficaPrincipal(filas, marcas) {
+  const cont = $('g-principal');
+  const conT = filas.filter((f) => num(f.t));
+  const hayPres = filas.some((f) => num(f.luz) && f.luz > LUZ_GENTE);
+  const haySombra = marcas.some((k) => k.tipo === 'sombra');
+  $('ley-principal').innerHTML =
+    `<span>${MUESTRA.linea('--serie-1')}Temperatura</span>` +
+    `<span>${MUESTRA.escalon('--serie-2')}Setpoint del aire (encendido)</span>` +
+    `<span>${MUESTRA.banda()}Presencia (luz &gt; 100 lx)${hayPres ? '' : ': ninguna'}</span>` +
+    `<span>${MUESTRA.marca(false)}Comando mandado</span>` +
+    (haySombra ? `<span>${MUESTRA.marca(true)}Decisión en sombra que habría cambiado el aire</span>` : '');
+  if (!conT.length) { cont.innerHTML = '<p class="vacio">Sin lecturas de este día.</p>'; return; }
+
+  const [t0, t1] = dominioX(filas);
+  const vals = conT.map((f) => f.t).concat(filas.filter((f) => f.on && num(f.sp)).map((f) => f.sp));
+  const yLo = Math.floor((Math.min(...vals) - 0.3) * 2) / 2;
+  const yHi = Math.ceil((Math.max(...vals) + 0.3) * 2) / 2;
+  const alto = cont.clientWidth < 500 ? 230 : 280;
+  grafica(cont, {
+    alto, t0, t1, yLo, yHi,
+    etiqueta: 'Temperatura del cuarto y setpoint del aire a lo largo del día',
+    bandas: tramos(filas, (f) => num(f.luz) && f.luz > LUZ_GENTE),
+    capas: (svg, X, Y) => {
+      el('path', { d: escalones(filas, (f) => f.sp, (f) => f.on, X, Y), class: 'l-sp' }, svg);
+      el('path', { d: trazo(filas, (f) => f.t, X, Y), class: 'l-temp' }, svg);
+      marcasSVG(svg, marcas, X, 10, alto - 24);
+    },
+    puntos: filas.map((f) => ({ ts: f.ts, html: htmlFila(f), ys: [{ v: f.on ? f.sp : null, cls: 'p-sp' }, { v: f.t, cls: 'p-temp' }] })),
+  });
+}
+
+function graficasVivo(vivo) {
+  const cNivel = $('g-nivel'), cMs = $('g-ms');
+  const nivelOk = (f) => num(f.placa.nivel) && f.placa.nivel > 0;   // 0 = todavia no hay plan
+  $('ley-nivel').innerHTML =
+    `<span>${MUESTRA.linea('--serie-1')}Temperatura real</span>` +
+    `<span>${MUESTRA.escalon('--serie-2')}Nivel planeado por el ESP32</span>`;
+  const [t0, t1] = dominioX(vivo);
+  const vals = vivo.filter((f) => num(f.t)).map((f) => f.t).concat(vivo.filter(nivelOk).map((f) => f.placa.nivel));
+  if (!vals.length) { cNivel.innerHTML = '<p class="vacio">Sin datos.</p>'; }
+  else {
+    const yLo = Math.floor((Math.min(...vals) - 0.3) * 2) / 2;
+    const yHi = Math.ceil((Math.max(...vals) + 0.3) * 2) / 2;
+    grafica(cNivel, {
+      alto: 210, t0, t1, yLo, yHi, nY: 4,
+      etiqueta: 'Nivel planeado por el ESP32 contra la temperatura real',
+      capas: (svg, X, Y) => {
+        el('path', { d: escalones(vivo, (f) => f.placa.nivel, nivelOk, X, Y), class: 'l-sp' }, svg);
+        el('path', { d: trazo(vivo, (f) => f.t, X, Y), class: 'l-temp' }, svg);
+      },
+      puntos: vivo.map((f) => ({
+        ts: f.ts,
+        html: `<b>${hora(f.ts)}</b>` + filaTip('Temperatura', fmt(f.t, 1, '°C')) +
+              filaTip('Nivel planeado', nivelOk(f) ? fmt(f.placa.nivel, 2, '°C') : '—') +
+              filaTip('Deseada (sp_user)', fmt(f.rec.sp_user, 0, '°C')),
+        ys: [{ v: nivelOk(f) ? f.placa.nivel : null, cls: 'p-sp' }, { v: f.t, cls: 'p-temp' }],
+      })),
+    });
+  }
+
+  const res = vivo.filter((f) => f.placa.resolvio && num(f.placa.us));
+  if (!res.length) { cMs.innerHTML = '<p class="vacio">Todavía no ha resuelto el MPC.</p>'; return; }
+  const maxMs = Math.max(...res.map((f) => f.placa.us / 1000));
+  const yHi = maxMs * 1.15;
+  grafica(cMs, {
+    alto: 210, t0, t1, yLo: 0, yHi: Math.max(yHi, 1), nY: 4,
+    etiqueta: 'Tiempo de cálculo del MPC por decisión, en milisegundos',
+    capas: (svg, X, Y) => {
+      const w = Math.max(2, Math.min(8, (X(t0 + 300) - X(t0)) * 0.6));
+      for (const f of res) {
+        const ms = f.placa.us / 1000;
+        const y = Y(ms), h = Math.max(1, Y(0) - y);
+        el('rect', { x: (X(f.ts) - w / 2).toFixed(1), y: y.toFixed(1), width: w.toFixed(1), height: h.toFixed(1), rx: Math.min(2, w / 2), class: 'barra' }, svg);
+      }
+    },
+    puntos: res.map((f) => ({
+      ts: f.ts,
+      html: `<b>${hora(f.ts)}</b>` + filaTip('Cálculo', fmt(f.placa.us / 1000, 0, 'ms')) + filaTip('Iteraciones ADMM', String(f.placa.iter)),
+      ys: [],
+    })),
+  });
+}
+
+// ---------------------------------------------------------------- secciones
+
+function fichas(f) {
+  if (!f) { $('fichas').innerHTML = ''; return; }
+  const gente = num(f.luz) && f.luz > LUZ_GENTE;
+  const radar = f.radar === undefined ? '' : `; radar: ${f.radar ? 'ocupado' : 'libre'} (da falsos positivos)`;
+  const fichas = [
+    ['Temperatura', fmt(f.t, 1, '°C'), num(f.hum) ? 'humedad ' + fmt(f.hum, 0, '%') : ''],
+    ['Luz', fmt(f.luz, 0, 'lx'), gente ? 'encendida' : 'apagada o tenue'],
+    ['Presencia', gente ? 'Hay gente' : 'Vacía', 'por la luz (&gt; 100 lx)' + radar],
+    ['Aire', f.on ? 'Encendido' : 'Apagado', f.on ? 'setpoint ' + fmt(f.sp, 0, '°C') : (num(f.sp) ? 'último setpoint ' + fmt(f.sp, 0, '°C') : '')],
+  ];
+  $('fichas').innerHTML = fichas.map(([et, val, det]) =>
+    `<div class="ficha"><div class="et">${et}</div><div class="val">${esc(val)}</div><div class="det">${det}</div></div>`).join('');
+}
+
+function estado(d, filas, marcas) {
+  const md = modo(d);
+  const f = filas[filas.length - 1];
+  let h = `<span class="chip ${md.clase}">${md.texto}</span>`;
+  if (f) {
+    const edad = ahoraS() - f.ts;
+    if (edad > VIEJO) h += `<span class="chip critico">Sin datos nuevos: última lectura ${hace(edad)}</span>`;
+    h += `<span class="nota">Última lectura ${hora(f.ts)} (${hace(edad)})</span>`;
+  }
+  const ult = marcas.filter((k) => k.tipo === 'mandado').slice(-1)[0];
+  if (ult) h += `<span class="nota">Último comando mandado: ${esc(ult.texto)} a las ${hora(ult.ts)}</span>`;
+  $('estado').innerHTML = h;
+}
+
+function flujo(vivo) {
+  const res = vivo.filter((f) => f.placa.resolvio);
+  const f = res.length ? res[res.length - 1] : vivo[vivo.length - 1];
+  const p = f.placa, r = f.rec, ir = r.ir || {};
+  const dl = (pares) => '<dl>' + pares.map(([a, b]) => `<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('') + '</dl>';
+  const decidido = (p.on < 0 && p.sp < 0) ? 'sin cambio'
+    : [p.on === 1 ? 'encender' : p.on === 0 ? 'apagar' : null, p.sp >= 0 ? 'setpoint ' + p.sp + ' °C' : null].filter(Boolean).join(', ');
+  const destino = !f.cmd ? 'nada que mandar' : f.mandado ? 'MANDADO al aire' : 'sombra: no se mandó';
+  $('vivo-sub').textContent = `Última decisión del MPC: ${hora(f.ts)}` + (res.length ? ` (resuelve cada 5 min; ${res.length} decisiones hoy)` : ' (todavía no resuelve)');
+  $('flujo').innerHTML =
+    `<div class="caja"><h4>Entradas (registro)</h4>${dl([
+      ['Temperatura', fmt(r.t, 1, '°C')],
+      ['Luz', fmt(r.luz, 0, 'lx')],
+      ['Presencia', r.pres ? 'sí' : 'no'],
+      ['Aire ahora', ir.on ? 'encendido a ' + ir.sp + ' °C' : 'apagado'],
+      ['Deseada', fmt(r.sp_user, 0, '°C')],
+    ])}</div>` +
+    '<div class="flecha" aria-hidden="true">&rarr;</div>' +
+    `<div class="caja placa"><h4>ESP32 (TinyMPC)</h4>${dl([
+      ['Nivel planeado', num(p.nivel) && p.nivel > 0 ? fmt(p.nivel, 2, '°C') : '—'],
+      ['Iteraciones', num(p.iter) ? String(p.iter) : '—'],
+      ['Cálculo', num(p.us) ? fmt(p.us / 1000, 1, 'ms') : '—'],
+      ['Resolvió', p.resolvio ? 'sí, a las ' + hora(f.ts) : 'no en este minuto'],
+    ])}</div>` +
+    '<div class="flecha" aria-hidden="true">&rarr;</div>' +
+    `<div class="caja"><h4>Salidas</h4>${dl([
+      ['Decidió', decidido],
+      ['Comando API', describir(f.cmd)],
+      ['Destino', destino],
+    ])}</div>`;
+}
+
+// Frases en palabras de un modelo; las usan la ficha del modelo y la de lo aprendido.
+const pasoMin = (mod) => (mod && num(mod.dt_min) ? mod.dt_min : 5);
+// Deriva pasiva en C/h con el cuarto vacio, a oscuras y el aire apagado
+function derivaH(mod, T) {
+  const d = mod.usa_t_ext ? (mod.c || 0) : -(mod.alfa || 0) * T + (mod.c || 0);
+  return d * 60 / pasoMin(mod);
+}
+function textoDeriva(mod, T) {
+  const d = derivaH(mod, T);
+  return `${d >= 0 ? 'calienta' : 'enfría'} solo ${Math.abs(d).toFixed(2)} °C/h`;
+}
+const textoFrio = (mod) => (num(mod.u_sat) ? `${mod.u_sat.toFixed(2)} °C cada ${pasoMin(mod)} min` : '—');
+const textoEstab = (mod) => (num(mod.offset_ac)
+  ? `setpoint ${mod.offset_ac >= 0 ? '+' : '−'} ${Math.abs(mod.offset_ac).toFixed(1)} °C` : '—');
+const obedece = (mod) => (mod.kappa_ac || 0) >= KAPPA_MIN;
+const siNo = (b) => `<span class="${b ? 'si' : 'no'}">${b ? 'sí' : 'no'}</span>`;
+
+function modelo(mod, tActual) {
+  const cont = $('modelo');
+  if (!mod) {
+    cont.innerHTML = '<p class="vacio">Todavía no hay modelo: lo genera tools/identificar.py en datos/cocina/modelo_cocina.json.</p>';
+    return;
+  }
+  const dt = pasoMin(mod), ph = 60 / dt;
+  const T = num(tActual) ? tActual : 25;
+  const alfa = mod.alfa || 0, c = mod.c || 0;
+  const kappa = mod.kappa_ac || 0;
+  const frases = [];
+  frases.push(`Con el aire apagado, vacío y a oscuras, se <b>${textoDeriva(mod, T)}</b>` +
+    (mod.usa_t_ext ? ' (con el exterior a la misma temperatura)' : ` (estando a ${T.toFixed(1)} °C)`) + '.');
+  if (!mod.usa_t_ext && alfa > 0) frases.push(`Sin aire tiende a quedarse en unos <b>${(c / alfa).toFixed(1)} °C</b>.`);
+  if (num(mod.gamma_pres)) frases.push(`Con gente sube ${(mod.gamma_pres * ph).toFixed(2)} °C/h más; con la luz, ${((mod.beta_luz || 0) * ph).toFixed(2)} °C/h por cada ${mod.luz_escala || 1000} lx.`);
+  if (num(mod.u_sat)) frases.push(`El aire a fondo enfría hasta <b>${textoFrio(mod)}</b> (${(mod.u_sat * ph).toFixed(1)} °C/h).`);
+  if (num(mod.offset_ac)) frases.push(`Encendido, el cuarto se estabiliza en <b>${textoEstab(mod)}</b>` +
+    (num(mod.oscilacion_ac) ? ` (oscila ± ${mod.oscilacion_ac.toFixed(1)} °C)` : '') + '.');
+  frases.push(`¿Obedece al setpoint? ${siNo(obedece(mod))} ` +
+    `(kappa = ${kappa.toFixed(3)} por paso; con menos de ${KAPPA_MIN} el MPC solo enciende o apaga).`);
+  frases.push(`¿Enfría? ${siNo(!!mod.enfria)}` + (mod.enfria ? '' : ' (el MPC no debe usar este modelo)') + '.');
+  const v = mod.validacion || {};
+  if (num(v.rmse_1h_C)) frases.push(`Error al predecir 1 h: ${v.rmse_1h_C.toFixed(2)} °C con el aire apagado` +
+    (num(v.rmse_1h_encendido_C) ? `, ${v.rmse_1h_encendido_C.toFixed(2)} °C encendido` : '') +
+    (num(v.dias) ? ` (${v.dias} días de datos)` : '') + '.');
+
+  const tira = (nombre, arr) => {
+    if (!Array.isArray(arr) || !arr.length) return '';
+    const celdas = arr.map((p, i) => {
+      const ini = i * 30, fin = ini + 30;
+      const rango = `${pad(Math.floor(ini / 60))}:${pad(ini % 60)}–${pad(Math.floor(fin / 60) % 24)}:${pad(fin % 60)}`;
+      const pct = Math.round(Math.max(0, Math.min(1, p || 0)) * 100);
+      const fondo = pct ? `color-mix(in srgb, var(--serie-1) ${Math.max(12, pct)}%, var(--superficie))` : 'var(--reja)';
+      return `<div style="background:${fondo}" data-tip="<b>${esc(nombre)}</b> ${rango}<br>ocupada ${pct}% de las veces"></div>`;
+    }).join('');
+    const horas = [0, 6, 12, 18, 24].map((h) => `<span style="left:${h / 24 * 100}%">${h}h</span>`).join('');
+    return `<div class="tira-et">${esc(nombre)}</div><div class="tira" role="img" aria-label="Probabilidad de ocupación por media hora, ${esc(nombre)}">${celdas}</div><div class="tira-horas">${horas}</div>`;
+  };
+  const hor = mod.horario || {};
+  const crudo = Object.keys(mod).filter((k) => num(mod[k]) || typeof mod[k] === 'boolean')
+    .map((k) => `<tr><td>${esc(k)}</td><td>${esc(typeof mod[k] === 'number' ? +mod[k].toPrecision(5) : mod[k])}</td></tr>`).join('');
+  cont.innerHTML =
+    `<ul class="frases">${frases.map((s) => `<li>${s}</li>`).join('')}</ul>` +
+    '<h3>Horario de ocupación aprendido</h3><div class="nota">Más oscuro = más probable que haya gente en esa media hora.</div>' +
+    tira('Entre semana', hor.laboral) + tira('Fin de semana', hor.finde) +
+    `<details><summary>Parámetros crudos</summary><table class="crudo">${crudo}</table></details>`;
+}
+
+function log(lineas) {
+  const pre = $('log');
+  const abajo = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+  pre.textContent = lineas && lineas.length ? lineas.join('\n') : '(sin registro)';
+  if (abajo || !pre.dataset.visto) { pre.scrollTop = pre.scrollHeight; pre.dataset.visto = '1'; }
+}
+
+// ---------------------------------------------------------------- aprendido en linea
+
+// Parametros que la placa ajusta en linea, en el orden de la tabla
+const PARAMS_APR = [
+  ['u_sat', 'Frío a fondo (°C por paso)'],
+  ['kappa_ac', 'Cuánto obedece al setpoint'],
+  ['offset_ac', 'Dónde se estabiliza (°C sobre el setpoint)'],
+  ['oscilacion_ac', 'Oscilación con el aire encendido (°C)'],
+  ['b_ac', 'Frío que da aunque no importe el setpoint'],
+  ['alfa', 'Qué tan rápido se iguala con afuera'],
+  ['c', 'Calor propio del cuarto por paso'],
+  ['gamma_pres', 'Calor por la gente'],
+  ['beta_luz', 'Calor por la luz'],
+];
+// Las cuatro con grafica de evolucion
+const GRAF_APR = [
+  ['u_sat', 'Frío a fondo', '°C por paso'],
+  ['kappa_ac', 'Obedece al setpoint', 'kappa'],
+  ['offset_ac', 'Dónde se estabiliza', '°C sobre el setpoint'],
+  ['alfa', 'Se iguala con afuera', 'alfa'],
+];
+
+function cifra(v) {
+  if (!num(v)) return '—';
+  const a = Math.abs(v);
+  return a !== 0 && a < 0.1 ? v.toPrecision(3) : v.toFixed(a < 10 ? 3 : 1);
+}
+function cambioPct(prueba, ahora) {
+  if (!num(prueba) || !num(ahora) || Math.abs(prueba) < 1e-9) return '—';
+  const p = (ahora - prueba) / Math.abs(prueba) * 100;
+  return (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(Math.abs(p) < 10 ? 1 : 0) + ' %';
+}
+
+function aprendido(d, vivo, tActual) {
+  const conApr = vivo.filter((f) => f.aprendido && typeof f.aprendido === 'object');
+  const archivo = d.modelo_aprendido || null;
+  const tarjeta = $('t-aprendido');
+  tarjeta.hidden = !conApr.length && !archivo;
+  if (tarjeta.hidden) return;
+
+  const prueba = d.modelo || null;
+  const ultimaFila = conApr[conApr.length - 1];
+  // "ahora": la ultima fila con aprendido; si no hay, lo guardado en el archivo
+  const ahora = ultimaFila ? Object.assign({}, archivo || prueba || {}, ultimaFila.aprendido) : archivo;
+  const cuenta = (ultimaFila && ultimaFila.aprendido.cuenta) || (archivo && archivo.aprendizaje && archivo.aprendizaje.cuenta) || null;
+  const T = num(tActual) ? tActual : 25;
+
+  let sub = ultimaFila ? `Ahora = lo último que reportó la placa (${hora(ultimaFila.ts)}, ${conApr.length} lecturas hoy).`
+                       : 'Ahora = el archivo guardado (todavía no hay lecturas de hoy).';
+  const apz = archivo && archivo.aprendizaje;
+  if (apz && apz.guardado) sub += ` Guardado en archivo: ${apz.guardado.replace('T', ' ').slice(0, 16)}` + (apz.origen ? ` (partió de ${apz.origen})` : '') + '.';
+  if (!prueba) sub += ' No está modelo_cocina.json: sin columna de la prueba.';
+  $('apr-sub').textContent = sub;
+
+  const avisos = [];
+  if (ahora && ahora.enfria === false) {
+    avisos.push('El modelo aprendido dice que el aire NO enfría (enfria = false)' +
+      (prueba && prueba.enfria ? ', aunque en la prueba sí enfriaba' : '') + '. Revisar: el MPC no debe usar este modelo.');
+  }
+  $('apr-aviso').innerHTML = avisos.map((a) => `<div class="aviso-caja" role="alert">${esc(a)}</div>`).join('');
+
+  // frases en palabras, prueba -> ahora
+  const par = (fn) => (prueba ? fn(prueba) + ' &rarr; ' : '') + '<b>' + fn(ahora) + '</b>';
+  $('apr-frases').innerHTML = [
+    `Frío a fondo: ${par(textoFrio)}`,
+    `Se estabiliza en: ${par(textoEstab)}`,
+    `¿Obedece al setpoint? ${prueba ? siNo(obedece(prueba)) + ' &rarr; ' : ''}${siNo(obedece(ahora))}`,
+    `Con el aire apagado, vacío y a oscuras, se ${par((m) => textoDeriva(m, T))}` + (ahora.usa_t_ext ? '' : ` (a ${T.toFixed(1)} °C)`),
+    `¿Enfría? ${prueba ? siNo(!!prueba.enfria) + ' &rarr; ' : ''}${siNo(!!ahora.enfria)}`,
+  ].map((x) => `<li>${x}</li>`).join('');
+
+  // tabla
+  let filas = '<tr><th>Parámetro</th><th>Prueba</th><th>Ahora</th><th>Cambio</th></tr>';
+  for (const [k, nombre] of PARAMS_APR) {
+    const p = prueba ? prueba[k] : null, a = ahora[k];
+    filas += `<tr><td>${esc(nombre)}<span class="clave">${k}</span></td><td>${cifra(p)}</td><td><b>${cifra(a)}</b></td><td>${cambioPct(p, a)}</td></tr>`;
+  }
+  filas += `<tr><td>¿Enfría?<span class="clave">enfria</span></td><td>${prueba ? siNo(!!prueba.enfria) : '—'}</td><td>${siNo(!!ahora.enfria)}</td>` +
+    `<td>${prueba && !!prueba.enfria !== !!ahora.enfria ? 'cambió' : '—'}</td></tr>`;
+  $('apr-tabla').innerHTML = filas;
+
+  // contadores
+  if (cuenta) {
+    const n = (k) => `<b>${num(cuenta[k]) ? cuenta[k] : 0}</b>`;
+    $('apr-cuenta').innerHTML = `Aprendió con ${n('pasivos')} pasos apagado, ${n('encendido')} encendido, ` +
+      `${n('arranques')} arranques y ${n('estables')} tramos estables; descartó ${n('descartados')}.`;
+  } else {
+    $('apr-cuenta').textContent = '';
+  }
+
+  // graficas de evolucion
+  $('ley-apr').innerHTML = `<span>${MUESTRA.linea('--serie-1')}Aprendido</span>` +
+    (prueba ? `<span><svg width="18" height="10"><line x1="1" y1="5" x2="17" y2="5" stroke="var(--tinta-2)" stroke-width="1.5" stroke-dasharray="4 4"/></svg>Valor de la prueba</span>` : '');
+  const cont = $('apr-graficas');
+  cont.innerHTML = GRAF_APR.map(([k, nombre, unidad]) =>
+    `<div><h4>${esc(nombre)} <span>(${esc(unidad)})</span></h4><div class="graf" id="g-apr-${k}"></div></div>`).join('');
+  if (!conApr.length) {
+    cont.innerHTML = '<p class="vacio">Sin lecturas de hoy con lo aprendido; la evolución aparece cuando la placa resuelva.</p>';
+    return;
+  }
+  const [t0, t1] = dominioX(vivo);
+  for (const [k, nombre, unidad] of GRAF_APR) {
+    const pts = conApr.filter((f) => num(f.aprendido[k])).map((f) => ({ ts: f.ts, v: f.aprendido[k] }));
+    const caja = $('g-apr-' + k);
+    if (!pts.length) { caja.innerHTML = '<p class="vacio">Sin datos.</p>'; continue; }
+    const ref = prueba && num(prueba[k]) ? prueba[k] : null;
+    const vals = pts.map((p) => p.v).concat(ref === null ? [] : [ref]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const margen = (hi - lo) * 0.15 || Math.max(Math.abs(hi) * 0.05, 0.001);
+    lo -= margen; hi += margen;
+    grafica(caja, {
+      alto: 150, t0, t1, yLo: lo, yHi: hi, nY: 5, margenIzq: 50,
+      etiqueta: `Evolución de ${nombre} durante el día`,
+      capas: (svg, X, Y) => {
+        if (ref !== null) el('line', { x1: X(t0), x2: X(t1), y1: Y(ref), y2: Y(ref), class: 'l-ref' }, svg);
+        el('path', { d: trazo(pts, (p) => p.v, X, Y, 20 * 60), class: 'l-temp' }, svg);
+        const u = pts[pts.length - 1];
+        el('circle', { cx: X(u.ts), cy: Y(u.v), r: 3.5, class: 'p-temp' }, svg);
+      },
+      puntos: pts.map((p) => ({
+        ts: p.ts,
+        html: `<b>${hora(p.ts)}</b> <span class="nota">${esc(k)}</span>` + filaTip('Aprendido', cifra(p.v)) +
+              (ref !== null ? filaTip('Prueba', cifra(ref)) + filaTip('Cambio', cambioPct(ref, p.v)) : ''),
+        ys: [{ v: p.v, cls: 'p-temp' }],
+      })),
+    });
+  }
+}
+
+// ---------------------------------------------------------------- tooltip
+
+const tip = $('tip');
+function mostrarTip(html, x, y) {
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let l = x + 14, t = y + 14;
+  if (l + w > window.innerWidth - 8) l = x - w - 14;
+  if (l < 8) l = 8;
+  if (t + h > window.innerHeight - 8) t = y - h - 14;
+  if (t < 8) t = 8;
+  tip.style.left = l + 'px';
+  tip.style.top = t + 'px';
+}
+function ocultarTip() { tip.style.display = 'none'; }
+document.addEventListener('pointermove', (ev) => {
+  const e = ev.target.closest && ev.target.closest('[data-tip]');
+  if (e) mostrarTip(e.getAttribute('data-tip'), ev.clientX, ev.clientY);
+  else if (!(ev.target.classList && ev.target.classList.contains('capa-hover'))) ocultarTip();
+});
+
+// ---------------------------------------------------------------- ciclo
+
+function dibujar() {
+  const d = ultimo;
+  if (!d) return;
+  const { filas, marcas } = normalizar(d);
+  const f = filas[filas.length - 1];
+  const fecha = d.fecha || '';
+  if (!fechaSel && fecha.length === 8) $('fecha').value = `${fecha.slice(0, 4)}-${fecha.slice(4, 6)}-${fecha.slice(6)}`;
+  $('sub').textContent = `${fecha.slice(6)}/${fecha.slice(4, 6)}/${fecha.slice(0, 4)} · ` +
+    `${(d.prueba || []).length} lecturas de la prueba, ${(d.vivo || []).length} en vivo · hora de Ciudad de México`;
+  estado(d, filas, marcas);
+  fichas(f);
+  graficaPrincipal(filas, marcas);
+  const vivo = filas.filter((x) => x.fuente === 'vivo');
+  $('t-vivo').hidden = !vivo.length;
+  if (vivo.length) { flujo(vivo); graficasVivo(vivo); }
+  modelo(d.modelo, f && f.t);
+  aprendido(d, vivo, f && f.t);
+  log(d.log);
+  $('pie').textContent = `Actualizado ${hora(ahoraS(), true)}; se refresca cada 30 s. Solo lectura, servido desde 127.0.0.1.`;
+}
+
+async function cargar() {
+  try {
+    const r = await fetch('/api/datos' + (fechaSel ? '?fecha=' + fechaSel : ''), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    ultimo = await r.json();
+    $('error').hidden = true;
+  } catch (e) {
+    $('error').hidden = false;
+    $('error').textContent = 'No pude leer los datos (' + e.message + '). ¿Sigue corriendo tools/panel.py?';
+  }
+  dibujar();   // aunque falle, recalcula la antiguedad de la ultima lectura
+}
+
+$('fecha').addEventListener('change', (ev) => { fechaSel = ev.target.value.replace(/-/g, ''); cargar(); });
+$('hoy').addEventListener('click', () => { fechaSel = ''; cargar(); });
+$('recargar').addEventListener('click', cargar);
+let espera = null;
+window.addEventListener('resize', () => { clearTimeout(espera); espera = setTimeout(dibujar, 150); });
+setInterval(cargar, CADA_MS);
+cargar();
+</script>
+</body>
+</html>
